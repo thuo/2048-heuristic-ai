@@ -1,109 +1,108 @@
 function HTMLActuator() {
-  this.tileContainer    = document.querySelector(".tile-container");
-  this.scoreContainer   = document.querySelector(".score-container");
-  this.bestContainer    = document.querySelector(".best-container");
+  this.tileContainer = document.querySelector(".tile-container");
+  this.scoreContainer = document.querySelector(".score-container");
+  this.bestContainer = document.querySelector(".best-container");
   this.messageContainer = document.querySelector(".game-message");
+  this.button = document.querySelector(".restart-button");
 
   this.score = 0;
 }
 
-HTMLActuator.prototype.actuate = function (grid, metadata) {
+HTMLActuator.prototype.actuate = function(game, metadata) {
   var self = this;
 
-  window.requestAnimationFrame(function () {
+  window.requestAnimationFrame(function() {
     self.clearContainer(self.tileContainer);
 
-    grid.cells.forEach(function (column) {
-      column.forEach(function (cell) {
-        if (cell) {
-          self.addTile(cell);
+    for (var row = 0; row < game.grid.length; row++) {
+      for (var col = 0; col < game.grid.length; col++) {
+        var tile = game.grid[row][col];
+        if (tile) {
+          self.addTile({
+            value: tile,
+            position: [row, col],
+            origin: metadata.tileOrigins[row][col] || {}
+          });
         }
-      });
-    });
-
-    self.updateScore(metadata.score);
-    self.updateBestScore(metadata.bestScore);
-
-    if (metadata.terminated) {
-      if (metadata.over) {
-        self.message(false); // You lose
-      } else if (metadata.won) {
-        self.message(true); // You win!
       }
     }
 
+    self.updateScore(game.score);
+    self.updateBestScore(metadata.bestScore);
+
+    if (metadata.over) {
+      self.message();
+    }
   });
 };
 
-// Continues the game (both restart and keep playing)
-HTMLActuator.prototype.continueGame = function () {
-  this.clearMessage();
-};
-
-HTMLActuator.prototype.clearContainer = function (container) {
+HTMLActuator.prototype.clearContainer = function(container) {
   while (container.firstChild) {
     container.removeChild(container.firstChild);
   }
 };
 
-HTMLActuator.prototype.addTile = function (tile) {
+HTMLActuator.prototype.addTile = function(tile) {
   var self = this;
 
-  var wrapper   = document.createElement("div");
-  var inner     = document.createElement("div");
-  var position  = tile.previousPosition || { x: tile.x, y: tile.y };
-  var positionClass = this.positionClass(position);
+  var wrapper = document.createElement("div");
+  var inner = document.createElement("div");
 
-  // We can't use classlist because it somehow glitches when replacing classes
-  var classes = ["tile", "tile-" + tile.value, positionClass];
+  // render the tile in its previous position if it existed before
+  var positionClass = self.positionClass(tile.origin.position || tile.position);
 
-  if (tile.value > 2048) classes.push("tile-super");
+  var classes = ["tile", `tile-${tile.value}`, positionClass];
 
-  this.applyClasses(wrapper, classes);
+  if (tile.value > 2048) {
+    classes.push("tile-super");
+  }
+
+  if (tile.origin.position) {
+    // update a tile rendered in it's previous position to its
+    // current position in the next frame
+    window.setTimeout(function() {
+      window.requestAnimationFrame(function() {
+        classes[2] = self.positionClass(tile.position);
+        self.applyClasses(wrapper, classes);
+      });
+    }, 16);
+  } else if (tile.origin === "new") {
+    classes.push("tile-new");
+  } else if (Array.isArray(tile.origin)) {
+    classes.push("tile-merged");
+    for (var origin of tile.origin) {
+      self.addTile({
+        value: origin.tile,
+        position: tile.position,
+        origin: origin
+      });
+    }
+  }
+
+  self.applyClasses(wrapper, classes);
 
   inner.classList.add("tile-inner");
   inner.textContent = tile.value;
 
-  if (tile.previousPosition) {
-    // Make sure that the tile gets rendered in the previous position first
-    window.requestAnimationFrame(function () {
-      classes[2] = self.positionClass({ x: tile.x, y: tile.y });
-      self.applyClasses(wrapper, classes); // Update the position
-    });
-  } else if (tile.mergedFrom) {
-    classes.push("tile-merged");
-    this.applyClasses(wrapper, classes);
-
-    // Render the tiles that merged
-    tile.mergedFrom.forEach(function (merged) {
-      self.addTile(merged);
-    });
-  } else {
-    classes.push("tile-new");
-    this.applyClasses(wrapper, classes);
-  }
-
-  // Add the inner part of the tile to the wrapper
   wrapper.appendChild(inner);
 
-  // Put the tile on the board
-  this.tileContainer.appendChild(wrapper);
+  self.tileContainer.appendChild(wrapper);
 };
 
-HTMLActuator.prototype.applyClasses = function (element, classes) {
+HTMLActuator.prototype.applyClasses = function(element, classes) {
   element.setAttribute("class", classes.join(" "));
 };
 
-HTMLActuator.prototype.normalizePosition = function (position) {
-  return { x: position.x + 1, y: position.y + 1 };
+HTMLActuator.prototype.normalizePosition = function(position) {
+  return { x: position[1] + 1, y: position[0] + 1 };
 };
 
-HTMLActuator.prototype.positionClass = function (position) {
+HTMLActuator.prototype.positionClass = function(position) {
   position = this.normalizePosition(position);
   return "tile-position-" + position.x + "-" + position.y;
 };
 
-HTMLActuator.prototype.updateScore = function (score) {
+HTMLActuator.prototype.updateScore = function(score) {
   this.clearContainer(this.scoreContainer);
 
   var difference = score - this.score;
@@ -120,20 +119,28 @@ HTMLActuator.prototype.updateScore = function (score) {
   }
 };
 
-HTMLActuator.prototype.updateBestScore = function (bestScore) {
+HTMLActuator.prototype.updateBestScore = function(bestScore) {
   this.bestContainer.textContent = bestScore;
 };
 
-HTMLActuator.prototype.message = function (won) {
-  var type    = won ? "game-won" : "game-over";
-  var message = won ? "You win!" : "Game over!";
-
-  this.messageContainer.classList.add(type);
-  this.messageContainer.getElementsByTagName("p")[0].textContent = message;
+HTMLActuator.prototype.message = function() {
+  this.messageContainer.classList.add("game-over");
+  this.messageContainer.getElementsByTagName("p")[0].textContent = "Game over!";
 };
 
-HTMLActuator.prototype.clearMessage = function () {
-  // IE only takes one value to remove at a time.
-  this.messageContainer.classList.remove("game-won");
+HTMLActuator.prototype.clearMessage = function() {
   this.messageContainer.classList.remove("game-over");
+};
+
+HTMLActuator.prototype.updateButton = function(options) {
+  var button = this.button;
+  window.requestAnimationFrame(function() {
+    if (options.over) {
+      button.textContent = "New Game";
+    } else if (options.isRunningAI) {
+      button.textContent = "Stop AI";
+    } else {
+      button.textContent = "Start AI";
+    }
+  });
 };
