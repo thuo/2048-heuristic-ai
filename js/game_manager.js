@@ -3,11 +3,13 @@ function GameManager(size, InputManager, Actuator, StorageManager) {
   this.storageManager = new StorageManager();
   this.actuator = new Actuator();
   this.engine = new Engine();
-  this.ai = new AI(this.engine);
+  this.worker = new Worker("js/worker.js");
 
   this.inputManager.on("move", this.move.bind(this));
   this.inputManager.on("restart", this.restart.bind(this));
   this.inputManager.on("toggleAI", this.toggleAI.bind(this));
+
+  this.worker.onmessage = this.handleWorkerMessage.bind(this);
 
   this.tileOrigins = null;
   this.isRunningAI = false;
@@ -17,6 +19,13 @@ function GameManager(size, InputManager, Actuator, StorageManager) {
 
   this.setup();
 }
+
+GameManager.prototype.handleWorkerMessage = function(event) {
+  this.move(event.data);
+  if (this.isRunningAI && !this.over) {
+    this.worker.postMessage(this.game);
+  }
+};
 
 // Restart the game
 GameManager.prototype.restart = function() {
@@ -90,20 +99,13 @@ GameManager.prototype.move = function(direction) {
 
 GameManager.prototype.startAI = function() {
   this.isRunningAI = true;
-  this.runAI();
+  this.worker.postMessage(this.game);
   this.updateButton();
 };
 
 GameManager.prototype.stopAI = function() {
   this.isRunningAI = false;
   this.updateButton();
-};
-
-GameManager.prototype.runAI = function() {
-  if (this.isRunningAI && !this.over) {
-    setTimeout(this.runAI.bind(this), 50);
-    this.move(this.ai.getBestMove(this.game));
-  }
 };
 
 // Sends the updated grid to the actuator
