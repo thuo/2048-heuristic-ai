@@ -1,16 +1,25 @@
 class AI {
   constructor(engine) {
     this.engine = engine;
+    this.timeLimitMs = 100;
   }
 
   getBestMove(game) {
-    return this.search(
-      game,
-      9,
-      Number.NEGATIVE_INFINITY,
-      Number.POSITIVE_INFINITY,
-      true
-    ).bestMove;
+    // alpha-beta pruning with iterative deepening
+    const startTime = Date.now();
+    let depth = 1;
+    let result;
+    while (Date.now() < startTime + this.timeLimitMs) {
+      result = this.search(
+        game,
+        depth,
+        Number.NEGATIVE_INFINITY,
+        Number.POSITIVE_INFINITY,
+        true
+      );
+      depth++;
+    }
+    return result.bestMove;
   }
 
   search(game, depth, alpha, beta, maximizing) {
