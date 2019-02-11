@@ -6,29 +6,37 @@ class AI {
 
   getBestMove(game) {
     // alpha-beta pruning with iterative deepening
-    const startTime = Date.now();
-    let depth = 1;
-    let result;
-    while (Date.now() < startTime + this.timeLimitMs) {
-      result = this.search(
+    this.startTime = Date.now();
+    let bestMove;
+    for (let depth = 1; ; depth++) {
+      const result = this.search(
         game,
         depth,
         Number.NEGATIVE_INFINITY,
         Number.POSITIVE_INFINITY,
         true
       );
-      depth++;
+      if (!result.completed) {
+        // break the loop before updating the best move so that the
+        // incomplete search doesn't affect the best move
+        break;
+      }
+      bestMove = result.bestMove;
     }
-    return result.bestMove;
+    return bestMove;
   }
 
   search(game, depth, alpha, beta, maximizing) {
-    if (depth === 0) {
-      return { value: this.eval(game).value };
+    if (depth === 0 || Date.now() >= this.startTime + this.timeLimitMs) {
+      return {
+        value: this.eval(game).value,
+        completed: depth === 0
+      };
     }
     if (maximizing) {
       let value = Number.NEGATIVE_INFINITY;
       let bestMove;
+      let completed;
       for (let direction = 0; direction < 4; direction++) {
         const clone = this.engine.clone(game);
         if (!this.engine.move(clone)(direction).moved) {
@@ -40,16 +48,18 @@ class AI {
         if (result.value >= value) {
           value = result.value;
           bestMove = direction;
+          completed = result.completed;
         }
         alpha = Math.max(alpha, value);
         if (alpha >= beta) {
           break;
         }
       }
-      return { value, bestMove };
+      return { value, bestMove, completed };
     } else {
       let value = Number.POSITIVE_INFINITY;
       let children = [];
+      let completed;
       for (let row = 0; row < game.grid.length; row++) {
         for (let col = 0; col < game.grid.length; col++) {
           if (!game.grid[row][col]) {
@@ -62,16 +72,17 @@ class AI {
       for (let child of children) {
         const clone = this.engine.clone(game);
         clone.grid[child.pos.row][child.pos.col] = child.tile;
-        value = Math.min(
-          value,
-          this.search(clone, depth - 1, alpha, beta, true).value
-        );
+        const result = this.search(clone, depth - 1, alpha, beta, true);
+        if (result.value <= value) {
+          value = result.value;
+          completed = result.completed;
+        }
         beta = Math.min(beta, value);
         if (alpha >= beta) {
           break;
         }
       }
-      return { value };
+      return { value, completed };
     }
   }
 
