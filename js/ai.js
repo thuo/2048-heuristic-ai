@@ -89,15 +89,31 @@ class AI {
   eval(game) {
     const heuristics = {
       empty: { value: 0, weight: 1 },
-      score: { value: game.score, weight: 0.07 }
+      score: { value: game.score, weight: 0.0625 },
+      duplication: { value: 0, weight: 0.375 }
     };
 
+    const count = {};
     for (let row = 0; row < game.grid.length; row++) {
       for (let col = 0; col < game.grid.length; col++) {
         const tile = game.grid[row][col];
         if (!tile) {
           heuristics.empty.value++;
+          continue;
         }
+        if (count[tile] !== undefined) {
+          count[tile]++;
+        } else {
+          // we want to count every extra occurrence so we will count the
+          // first occurrence as 0
+          count[tile] = 0;
+        }
+      }
+    }
+
+    for (const tile of Object.keys(count)) {
+      if (tile > 4) {
+        heuristics.duplication.value -= tile * count[tile];
       }
     }
 
