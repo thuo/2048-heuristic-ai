@@ -21,9 +21,11 @@ function GameManager(size, InputManager, Actuator, StorageManager) {
 }
 
 GameManager.prototype.handleWorkerMessage = function(event) {
-  this.move(event.data);
-  if (this.isRunningAI && !this.over) {
-    this.worker.postMessage(this.game);
+  if (this.isRunningAI) {
+    this.move(event.data);
+    if (!this.over) {
+      this.worker.postMessage(this.game);
+    }
   }
 };
 
