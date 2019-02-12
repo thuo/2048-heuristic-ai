@@ -33,21 +33,30 @@ class AI {
         completed: depth === 0
       };
     }
+
     if (maximizing) {
+      let children = [];
+      for (let direction = 0; direction < 4; direction++) {
+        const clone = this.engine.clone(game);
+        if (this.engine.move(clone)(direction).moved) {
+          children.push({
+            game: clone,
+            value: this.eval(clone).value,
+            direction
+          });
+        }
+      }
+      // evaluate higher valued moves first
+      children.sort((a, b) => b.value - a.value);
+
       let value = Number.NEGATIVE_INFINITY;
       let bestMove;
       let completed;
-      for (let direction = 0; direction < 4; direction++) {
-        const clone = this.engine.clone(game);
-        if (!this.engine.move(clone)(direction).moved) {
-          // if this direction didn't change the grid, we won't
-          // evaluate it any further.
-          continue;
-        }
-        const result = this.search(clone, depth - 1, alpha, beta, false);
+      for (let child of children) {
+        const result = this.search(child.game, depth - 1, alpha, beta, false);
         if (result.value >= value) {
           value = result.value;
-          bestMove = direction;
+          bestMove = child.direction;
           completed = result.completed;
         }
         alpha = Math.max(alpha, value);
@@ -57,9 +66,7 @@ class AI {
       }
       return { value, bestMove, completed };
     } else {
-      let value = Number.POSITIVE_INFINITY;
       let children = [];
-      let completed;
       for (let row = 0; row < game.grid.length; row++) {
         for (let col = 0; col < game.grid.length; col++) {
           if (!game.grid[row][col]) {
@@ -69,6 +76,9 @@ class AI {
           }
         }
       }
+
+      let value = Number.POSITIVE_INFINITY;
+      let completed;
       for (let child of children) {
         const clone = this.engine.clone(game);
         clone.grid[child.pos.row][child.pos.col] = child.tile;
