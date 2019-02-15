@@ -1,7 +1,7 @@
 class AI {
   constructor(engine) {
     this.engine = engine;
-    this.timeLimitMs = 100;
+    this.timeLimitMs = 250;
   }
 
   getBestMove(game) {
@@ -98,9 +98,10 @@ class AI {
 
   eval(game) {
     const heuristics = {
-      empty: { value: 0, weight: 1 },
+      empty: { value: 0, weight: 5 },
       score: { value: game.score, weight: 0.0625 },
-      duplication: { value: 0, weight: 0.375 }
+      duplication: { value: 0, weight: 7.5 },
+      quality: { value: 0, weight: 2.5 }
     };
 
     const count = {};
@@ -118,6 +119,55 @@ class AI {
           // first occurrence as 0
           count[tile] = 0;
         }
+
+        let leftSlope;
+        let rightSlope;
+        if (row === 0) {
+          rightSlope = game.grid[row][col] > game.grid[row + 1][col] ? -1 : 1;
+          leftSlope = rightSlope;
+        } else if (row === game.grid.length - 1) {
+          leftSlope = game.grid[row - 1][col] > game.grid[row][col] ? -1 : 1;
+          rightSlope = leftSlope;
+        } else {
+          leftSlope = game.grid[row - 1][col] > game.grid[row][col] ? -1 : 1;
+          rightSlope = game.grid[row][col] > game.grid[row + 1][col] ? -1 : 1;
+          if (game.grid[row - 1][col] === game.grid[row][col]) {
+            leftSlope = rightSlope;
+          } else if (game.grid[row][col] === game.grid[row + 1][col]) {
+            rightSlope = leftSlope;
+          }
+        }
+
+        let topSlope;
+        let bottomSlope;
+        if (col === 0) {
+          bottomSlope = game.grid[row][col] > game.grid[row][col + 1] ? -1 : 1;
+          topSlope = bottomSlope;
+        } else if (col === game.grid.length - 1) {
+          topSlope = game.grid[row][col - 1] > game.grid[row][col] ? -1 : 1;
+          bottomSlope = topSlope;
+        } else {
+          topSlope = game.grid[row][col - 1] > game.grid[row][col] ? -1 : 1;
+          bottomSlope = game.grid[row][col] > game.grid[row][col + 1] ? -1 : 1;
+          if (game.grid[row][col - 1] === game.grid[row][col]) {
+            topSlope = bottomSlope;
+          } else if (game.grid[row][col] === game.grid[row][col + 1]) {
+            bottomSlope = topSlope;
+          }
+        }
+
+        let tileQuality = 0;
+        if (topSlope === bottomSlope && leftSlope === rightSlope) {
+          tileQuality += tile;
+        } else {
+          if (topSlope != bottomSlope) {
+            tileQuality -= tile;
+          }
+          if (leftSlope != rightSlope) {
+            tileQuality -= tile;
+          }
+        }
+        heuristics.quality.value += tileQuality;
       }
     }
 
