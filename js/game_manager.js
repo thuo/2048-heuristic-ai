@@ -1,4 +1,5 @@
 function GameManager(size, InputManager, Actuator, StorageManager) {
+  this.size = size;
   this.inputManager = new InputManager();
   this.storageManager = new StorageManager();
   this.actuator = new Actuator();
@@ -57,12 +58,7 @@ GameManager.prototype.setup = function() {
   } else {
     this.game = {
       score: 0,
-      grid: [
-        [null, null, null, null],
-        [null, null, null, null],
-        [null, null, null, null],
-        [null, null, null, null]
-      ]
+      grid: this.engine.createGrid(this.size)
     };
     this.over = false;
 
@@ -71,12 +67,7 @@ GameManager.prototype.setup = function() {
   }
 
   // Update the actuator
-  this.tileOrigins = [
-    ["new", "new", "new", "new"],
-    ["new", "new", "new", "new"],
-    ["new", "new", "new", "new"],
-    ["new", "new", "new", "new"]
-  ];
+  this.tileOrigins = this.engine.createGrid(this.size, "new");
   this.actuate();
 };
 

@@ -55,7 +55,7 @@ class Engine {
         orientation: { get, set, coordinates }
       } = this.directions[direction];
 
-      const tileOrigins = [[], [], [], []];
+      const tileOrigins = this.createGrid(game.grid.length);
       let moved = false;
 
       for (let x = 0; x < game.grid.length; x++) {
@@ -185,5 +185,16 @@ class Engine {
       string += "\n";
     }
     return string;
+  }
+
+  createGrid(size, fill = null) {
+    const grid = [];
+    for (let row = 0; row < size; row++) {
+      grid[row] = [];
+      for (let col = 0; col < size; col++) {
+        grid[row][col] = fill;
+      }
+    }
+    return grid;
   }
 }
