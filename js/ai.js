@@ -72,7 +72,6 @@ class AI {
           if (!game.grid[row][col]) {
             children.push({ tile: 2, pos: { row, col } });
             children.push({ tile: 4, pos: { row, col } });
-            break;
           }
         }
       }
