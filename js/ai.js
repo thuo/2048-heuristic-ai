@@ -100,10 +100,11 @@ class AI {
       empty: { value: 0, weight: 5 },
       score: { value: game.score, weight: 0.0625 },
       duplication: { value: 0, weight: 7.5 },
-      quality: { value: 0, weight: 2.5 }
+      quality: { value: 0, weight: 7.5 }
     };
 
-    const count = {};
+    // count empty cells and duplicates
+    const duplicates = {};
     for (let row = 0; row < game.grid.length; row++) {
       for (let col = 0; col < game.grid.length; col++) {
         const tile = game.grid[row][col];
@@ -111,76 +112,84 @@ class AI {
           heuristics.empty.value++;
           continue;
         }
-        if (count[tile] !== undefined) {
-          count[tile]++;
-        } else {
-          // we want to count every extra occurrence so we will count the
-          // first occurrence as 0
-          count[tile] = 0;
-        }
 
-        let leftSlope;
-        let rightSlope;
-        if (row === 0) {
-          rightSlope = game.grid[row][col] > game.grid[row + 1][col] ? -1 : 1;
-          leftSlope = rightSlope;
-        } else if (row === game.grid.length - 1) {
-          leftSlope = game.grid[row - 1][col] > game.grid[row][col] ? -1 : 1;
-          rightSlope = leftSlope;
+        if (duplicates[tile] !== undefined) {
+          duplicates[tile]++;
         } else {
-          leftSlope = game.grid[row - 1][col] > game.grid[row][col] ? -1 : 1;
-          rightSlope = game.grid[row][col] > game.grid[row + 1][col] ? -1 : 1;
-          if (game.grid[row - 1][col] === game.grid[row][col]) {
-            leftSlope = rightSlope;
-          } else if (game.grid[row][col] === game.grid[row + 1][col]) {
-            rightSlope = leftSlope;
-          }
+          duplicates[tile] = 0;
         }
-
-        let topSlope;
-        let bottomSlope;
-        if (col === 0) {
-          bottomSlope = game.grid[row][col] > game.grid[row][col + 1] ? -1 : 1;
-          topSlope = bottomSlope;
-        } else if (col === game.grid.length - 1) {
-          topSlope = game.grid[row][col - 1] > game.grid[row][col] ? -1 : 1;
-          bottomSlope = topSlope;
-        } else {
-          topSlope = game.grid[row][col - 1] > game.grid[row][col] ? -1 : 1;
-          bottomSlope = game.grid[row][col] > game.grid[row][col + 1] ? -1 : 1;
-          if (game.grid[row][col - 1] === game.grid[row][col]) {
-            topSlope = bottomSlope;
-          } else if (game.grid[row][col] === game.grid[row][col + 1]) {
-            bottomSlope = topSlope;
-          }
-        }
-
-        let tileQuality = 0;
-        if (topSlope === bottomSlope && leftSlope === rightSlope) {
-          tileQuality += tile;
-        } else {
-          if (topSlope != bottomSlope) {
-            tileQuality -= tile;
-          }
-          if (leftSlope != rightSlope) {
-            tileQuality -= tile;
-          }
-        }
-        heuristics.quality.value += tileQuality;
       }
     }
 
-    for (const tile of Object.keys(count)) {
+    // compute duplication heuristic
+    for (const tile of Object.keys(duplicates)) {
       if (tile > 4) {
-        heuristics.duplication.value -= tile * count[tile];
+        heuristics.duplication.value -= tile * duplicates[tile];
       }
     }
 
+    // compute quality heuristic
+    const qualities = this.engine.createGrid(game.grid.length, 0);
+
+    for (let row = 0; row < game.grid.length; row++) {
+      let prevDiff = 0;
+      let neighbourCol = -1;
+      for (let col = 0; col < game.grid.length; col++) {
+        const tile = game.grid[row][col];
+        if (!tile) {
+          continue;
+        }
+        let quality;
+        let neighbour = neighbourCol >= 0 ? game.grid[row][neighbourCol] : null;
+        if (neighbour) {
+          let diff = tile - neighbour;
+          if ((prevDiff >= 0 && diff >= 0) || (prevDiff <= 0 && diff <= 0)) {
+            quality = tile;
+          } else {
+            quality = -Math.min(Math.abs(prevDiff), Math.abs(diff));
+          }
+          prevDiff = diff;
+        } else {
+          quality = tile;
+        }
+        neighbourCol = col;
+        qualities[row][col] = quality;
+      }
+    }
+
+    for (let col = 0; col < game.grid.length; col++) {
+      let prevDiff = 0;
+      let neighbourRow = -1;
+      for (let row = 0; row < game.grid.length; row++) {
+        const tile = game.grid[row][col];
+        if (!tile) {
+          continue;
+        }
+        let quality;
+        let neighbour = neighbourRow >= 0 ? game.grid[neighbourRow][col] : null;
+        if (neighbour) {
+          let diff = tile - neighbour;
+          if ((prevDiff >= 0 && diff >= 0) || (prevDiff <= 0 && diff <= 0)) {
+            quality = tile;
+          } else {
+            quality = -Math.min(Math.abs(prevDiff), Math.abs(diff));
+          }
+          prevDiff = diff;
+        } else {
+          quality = tile;
+        }
+        neighbourRow = row;
+        qualities[row][col] = Math.min(qualities[row][col], quality);
+        heuristics.quality.value += qualities[row][col];
+      }
+    }
+
+    // combine heuristics
     let value = 0;
     for (const heuristic of Object.keys(heuristics)) {
       value += heuristics[heuristic].value * heuristics[heuristic].weight;
     }
 
-    return { value, heuristics };
+    return { value, heuristics, qualities };
   }
 }
