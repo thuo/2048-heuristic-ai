@@ -96,23 +96,54 @@ class AI {
   }
 
   eval(game) {
+    const { gridQuality, qualityPerTile } = this.quality(game.grid);
     const heuristics = {
-      empty: { value: 0, weight: 5 },
-      score: { value: game.score, weight: 0.0625 },
-      duplication: { value: 0, weight: 7.5 },
-      quality: { value: 0, weight: 7.5 }
+      empty: {
+        value: this.empty(game.grid),
+        weight: 5
+      },
+      score: {
+        value: game.score,
+        weight: 0.0625
+      },
+      duplication: {
+        value: this.duplication(game.grid),
+        weight: 7.5
+      },
+      quality: {
+        value: gridQuality,
+        weight: 7.5
+      }
     };
 
-    // count empty cells and duplicates
+    let value = 0;
+    for (const heuristic of Object.keys(heuristics)) {
+      value += heuristics[heuristic].value * heuristics[heuristic].weight;
+    }
+
+    return { value, heuristics, qualityPerTile };
+  }
+
+  empty(grid) {
+    let empty = 0;
+    for (let row = 0; row < grid.length; row++) {
+      for (let col = 0; col < grid.length; col++) {
+        if (!grid[row][col]) {
+          empty++;
+        }
+      }
+    }
+    return empty;
+  }
+
+  duplication(grid) {
     const duplicates = {};
-    for (let row = 0; row < game.grid.length; row++) {
-      for (let col = 0; col < game.grid.length; col++) {
-        const tile = game.grid[row][col];
+    for (let row = 0; row < grid.length; row++) {
+      for (let col = 0; col < grid.length; col++) {
+        const tile = grid[row][col];
         if (!tile) {
-          heuristics.empty.value++;
           continue;
         }
-
         if (duplicates[tile] !== undefined) {
           duplicates[tile]++;
         } else {
@@ -120,76 +151,70 @@ class AI {
         }
       }
     }
-
-    // compute duplication heuristic
+    let duplication = 0;
     for (const tile of Object.keys(duplicates)) {
       if (tile > 4) {
-        heuristics.duplication.value -= tile * duplicates[tile];
+        duplication -= tile * duplicates[tile];
       }
     }
+    return duplication;
+  }
 
-    // compute quality heuristic
-    const qualities = this.engine.createGrid(game.grid.length, 0);
-
-    for (let row = 0; row < game.grid.length; row++) {
+  quality(grid) {
+    let gridQuality = 0;
+    const qualityPerTile = this.engine.createGrid(grid.length, 0);
+    for (let row = 0; row < grid.length; row++) {
       let prevDiff = 0;
       let neighbourCol = -1;
-      for (let col = 0; col < game.grid.length; col++) {
-        const tile = game.grid[row][col];
+      for (let col = 0; col < grid.length; col++) {
+        const tile = grid[row][col];
         if (!tile) {
           continue;
         }
-        let quality;
-        let neighbour = neighbourCol >= 0 ? game.grid[row][neighbourCol] : null;
+        let tileQuality;
+        let neighbour = neighbourCol >= 0 ? grid[row][neighbourCol] : null;
         if (neighbour) {
           let diff = tile - neighbour;
           if ((prevDiff >= 0 && diff >= 0) || (prevDiff <= 0 && diff <= 0)) {
-            quality = tile;
+            tileQuality = tile;
           } else {
-            quality = -Math.min(Math.abs(prevDiff), Math.abs(diff));
+            tileQuality = -Math.min(Math.abs(prevDiff), Math.abs(diff));
           }
           prevDiff = diff;
         } else {
-          quality = tile;
+          tileQuality = tile;
         }
         neighbourCol = col;
-        qualities[row][col] = quality;
+        qualityPerTile[row][col] = tileQuality;
       }
     }
 
-    for (let col = 0; col < game.grid.length; col++) {
+    for (let col = 0; col < grid.length; col++) {
       let prevDiff = 0;
       let neighbourRow = -1;
-      for (let row = 0; row < game.grid.length; row++) {
-        const tile = game.grid[row][col];
+      for (let row = 0; row < grid.length; row++) {
+        const tile = grid[row][col];
         if (!tile) {
           continue;
         }
-        let quality;
-        let neighbour = neighbourRow >= 0 ? game.grid[neighbourRow][col] : null;
+        let tileQuality;
+        let neighbour = neighbourRow >= 0 ? grid[neighbourRow][col] : null;
         if (neighbour) {
           let diff = tile - neighbour;
           if ((prevDiff >= 0 && diff >= 0) || (prevDiff <= 0 && diff <= 0)) {
-            quality = tile;
+            tileQuality = tile;
           } else {
-            quality = -Math.min(Math.abs(prevDiff), Math.abs(diff));
+            tileQuality = -Math.min(Math.abs(prevDiff), Math.abs(diff));
           }
           prevDiff = diff;
         } else {
-          quality = tile;
+          tileQuality = tile;
         }
         neighbourRow = row;
-        qualities[row][col] = Math.min(qualities[row][col], quality);
-        heuristics.quality.value += qualities[row][col];
+        qualityPerTile[row][col] = Math.min(qualityPerTile[row][col], tileQuality);
+        gridQuality += qualityPerTile[row][col];
       }
     }
-
-    // combine heuristics
-    let value = 0;
-    for (const heuristic of Object.keys(heuristics)) {
-      value += heuristics[heuristic].value * heuristics[heuristic].weight;
-    }
-
-    return { value, heuristics, qualities };
+    return { gridQuality, qualityPerTile };
   }
 }
