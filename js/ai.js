@@ -1,7 +1,7 @@
 class AI {
   constructor(engine) {
     this.engine = engine;
-    this.timeLimitMs = 250;
+    this.timeLimitMs = 200;
   }
 
   getBestMove(game) {
@@ -100,19 +100,15 @@ class AI {
     const heuristics = {
       empty: {
         value: this.empty(game.grid),
-        weight: 5
-      },
-      score: {
-        value: game.score,
-        weight: 0.0625
+        weight: 1
       },
       duplication: {
         value: this.duplication(game.grid),
-        weight: 7.5
+        weight: 2
       },
       quality: {
         value: gridQuality,
-        weight: 7.5
+        weight: 100
       }
     };
 
@@ -144,16 +140,17 @@ class AI {
         if (!tile) {
           continue;
         }
-        if (duplicates[tile] !== undefined) {
-          duplicates[tile]++;
+        const tileCost = Math.log2(tile);
+        if (duplicates[tileCost] !== undefined) {
+          duplicates[tileCost]++;
         } else {
-          duplicates[tile] = 0;
+          duplicates[tileCost] = 0;
         }
       }
     }
     let duplication = 0;
     for (const tile of Object.keys(duplicates)) {
-      if (tile > 4) {
+      if (tile > 2) {
         duplication -= tile * duplicates[tile];
       }
     }
@@ -176,7 +173,7 @@ class AI {
         if (neighbour) {
           let diff = tile - neighbour;
           if ((prevDiff >= 0 && diff >= 0) || (prevDiff <= 0 && diff <= 0)) {
-            tileQuality = tile;
+            tileQuality = tile > neighbour ? neighbour / tile : tile / neighbour;
           } else {
             tileQuality = -Math.min(Math.abs(prevDiff), Math.abs(diff));
           }
@@ -202,7 +199,7 @@ class AI {
         if (neighbour) {
           let diff = tile - neighbour;
           if ((prevDiff >= 0 && diff >= 0) || (prevDiff <= 0 && diff <= 0)) {
-            tileQuality = tile;
+            tileQuality = tile > neighbour ? neighbour / tile : tile / neighbour;
           } else {
             tileQuality = -Math.min(Math.abs(prevDiff), Math.abs(diff));
           }
@@ -211,7 +208,11 @@ class AI {
           tileQuality = tile;
         }
         neighbourRow = row;
-        qualityPerTile[row][col] = Math.min(qualityPerTile[row][col], tileQuality);
+        if (qualityPerTile[row][col] > 0 && tileQuality > 0) {
+          qualityPerTile[row][col] = Math.max(qualityPerTile[row][col], tileQuality);
+        } else {
+          qualityPerTile[row][col] = Math.min(qualityPerTile[row][col], tileQuality);
+        }
         gridQuality += qualityPerTile[row][col];
       }
     }

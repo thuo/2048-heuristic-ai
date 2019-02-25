@@ -2,5 +2,5 @@
   "eslint.enable": false,
   "editor.formatOnSave": false,
   "javascript.validate.enable": true,
-  "prettier.printWidth": 80
+  "prettier.printWidth": 100
 }
