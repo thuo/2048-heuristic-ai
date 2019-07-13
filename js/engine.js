@@ -1,21 +1,21 @@
 class Engine {
   constructor() {
     this.intervals = {
-      incremental: grid => ({ start: 0, step: 1, end: grid.length }),
-      decremental: grid => ({ start: grid.length - 1, step: -1, end: -1 })
+      incremental: size => ({ start: 0, step: 1, end: size }),
+      decremental: size => ({ start: size - 1, step: -1, end: -1 })
     };
 
     this.orientations = {
       vertical: {
-        get: grid => (x, y) => grid[y][x],
-        set: grid => (x, y) => tile => {
+        get: (grid, x, y) => grid[y][x],
+        set: (grid, x, y, tile) => {
           grid[y][x] = tile;
         },
         coordinates: (x, y) => [y, x]
       },
       horizontal: {
-        get: grid => (x, y) => grid[x][y],
-        set: grid => (x, y) => tile => {
+        get: (grid, x, y) => grid[x][y],
+        set: (grid, x, y, tile) => {
           grid[x][y] = tile;
         },
         coordinates: (x, y) => [x, y]
@@ -46,72 +46,58 @@ class Engine {
     };
   }
 
-  move(game) {
-    return direction => {
-      const { start, step, end } = this.directions[direction].interval(
-        game.grid
-      );
-      const {
-        orientation: { get, set, coordinates }
-      } = this.directions[direction];
+  move(game, direction) {
+    const { start, step, end } = this.directions[direction].interval(game.grid.length);
+    const {
+      orientation: { get, set, coordinates }
+    } = this.directions[direction];
 
-      const tileOrigins = this.createGrid(game.grid.length);
-      let moved = false;
+    const tileOrigins = this.createGrid(game.grid.length);
+    let moved = false;
 
-      for (let x = 0; x < game.grid.length; x++) {
-        let targetY = start;
-        for (let y = start + step; y !== end; y += step) {
-          let currentTile = get(game.grid)(x, y);
-          let targetTile = get(game.grid)(x, targetY);
-          if (!currentTile) {
-            // the target cell remains the same
-            continue;
-          }
-          if (!targetTile) {
-            set(game.grid)(x, targetY)(currentTile);
-            set(game.grid)(x, y)(null);
-            set(tileOrigins)(x, targetY)({
-              position: coordinates(x, y)
-            });
-            moved = true;
-            // we just moved a tile into the target cell which was empty, so,
-            // we will keep the target cell the same so that if we can
-            // merge the moved tile later, it will be in the target cell
-            continue;
-          }
-          // from here on, there will always be a tile in the target cell
-          if (targetTile === currentTile) {
-            set(game.grid)(x, targetY)(targetTile + currentTile);
-            set(game.grid)(x, y)(null);
-            set(tileOrigins)(x, targetY)([
-              {
-                position: coordinates(x, targetY),
-                tile: targetTile
-              },
-              {
-                position: coordinates(x, y),
-                tile: currentTile
-              }
-            ]);
-            game.score = game.score + get(game.grid)(x, targetY);
-            moved = true;
-          } else if (targetY + step !== y) {
-            // there's a tile in the target cell but we couldn't merge it with
-            // the curerent cell, so, we will move the current tile to the cell
-            // after the target cell, unless it's already there (that's why
-            // we're checking targetY + step !== y)
-            set(game.grid)(x, targetY + step)(currentTile);
-            set(game.grid)(x, y)(null);
-            set(tileOrigins)(x, targetY + step)({
-              position: coordinates(x, y)
-            });
-            moved = true;
-          }
-          targetY += step;
+    for (let x = 0; x < game.grid.length; x++) {
+      let targetY = start;
+      for (let y = start + step; y !== end; y += step) {
+        let currentTile = get(game.grid, x, y);
+        if (!currentTile) {
+          // the target cell remains the same
+          continue;
         }
+        let targetTile = get(game.grid, x, targetY);
+        if (!targetTile) {
+          set(game.grid, x, targetY, currentTile);
+          set(game.grid, x, y, null);
+          set(tileOrigins, x, targetY, { position: coordinates(x, y) });
+          moved = true;
+          // we just moved a tile into the target cell which was empty, so,
+          // we will keep the target cell the same so that if we can
+          // merge the moved tile later, it will be in the target cell
+          continue;
+        }
+        // from here on, there will always be a tile in the target cell
+        if (targetTile === currentTile) {
+          set(game.grid, x, targetY, targetTile + currentTile);
+          set(game.grid, x, y, null);
+          set(tileOrigins, x, targetY, [
+            { position: coordinates(x, targetY), tile: targetTile },
+            { position: coordinates(x, y), tile: currentTile }
+          ]);
+          game.score = game.score + get(game.grid, x, targetY);
+          moved = true;
+        } else if (targetY + step !== y) {
+          // there's a tile in the target cell but we couldn't merge it with
+          // the curerent cell, so, we will move the current tile to the cell
+          // after the target cell, unless it's already there (that's why
+          // we're checking targetY + step !== y)
+          set(game.grid, x, targetY + step, currentTile);
+          set(game.grid, x, y, null);
+          set(tileOrigins, x, targetY + step, { position: coordinates(x, y) });
+          moved = true;
+        }
+        targetY += step;
       }
-      return { moved, tileOrigins };
-    };
+    }
+    return { moved, tileOrigins };
   }
 
   addRandomTile(grid) {

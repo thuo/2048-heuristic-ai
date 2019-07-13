@@ -78,7 +78,7 @@ GameManager.prototype.addStartTiles = function() {
 };
 
 GameManager.prototype.move = function(direction) {
-  var metadata = this.engine.move(this.game)(direction);
+  var metadata = this.engine.move(this.game, direction);
   this.tileOrigins = metadata.tileOrigins;
   if (metadata.moved) {
     var position = this.engine.addRandomTile(this.game.grid);

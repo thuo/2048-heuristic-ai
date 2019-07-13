@@ -38,7 +38,7 @@ class AI {
       let children = [];
       for (let direction = 0; direction < 4; direction++) {
         const clone = this.engine.clone(game);
-        if (this.engine.move(clone)(direction).moved) {
+        if (this.engine.move(clone, direction).moved) {
           children.push({
             game: clone,
             value: this.eval(clone).value,
