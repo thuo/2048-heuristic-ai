@@ -1,4 +1,4 @@
-class Engine {
+class Gameplay {
   constructor() {
     this.intervals = {
       incremental: size => ({ start: 0, step: 1, end: size }),

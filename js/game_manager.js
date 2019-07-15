@@ -3,7 +3,7 @@ function GameManager(size, InputManager, Actuator, StorageManager) {
   this.inputManager = new InputManager();
   this.storageManager = new StorageManager();
   this.actuator = new Actuator();
-  this.engine = new Engine();
+  this.gameplay = new Gameplay();
   this.worker = new Worker("js/worker.js");
 
   this.inputManager.on("move", this.move.bind(this));
@@ -58,7 +58,7 @@ GameManager.prototype.setup = function() {
   } else {
     this.game = {
       score: 0,
-      grid: this.engine.createGrid(this.size)
+      grid: this.gameplay.createGrid(this.size)
     };
     this.over = false;
 
@@ -67,24 +67,24 @@ GameManager.prototype.setup = function() {
   }
 
   // Update the actuator
-  this.tileOrigins = this.engine.createGrid(this.size, "new");
+  this.tileOrigins = this.gameplay.createGrid(this.size, "new");
   this.actuate();
 };
 
 // Set up the initial tiles to start the game with
 GameManager.prototype.addStartTiles = function() {
-  this.engine.addRandomTile(this.game.grid);
-  this.engine.addRandomTile(this.game.grid);
+  this.gameplay.addRandomTile(this.game.grid);
+  this.gameplay.addRandomTile(this.game.grid);
 };
 
 GameManager.prototype.move = function(direction) {
-  var metadata = this.engine.move(this.game, direction);
+  var metadata = this.gameplay.move(this.game, direction);
   this.tileOrigins = metadata.tileOrigins;
   if (metadata.moved) {
-    var position = this.engine.addRandomTile(this.game.grid);
+    var position = this.gameplay.addRandomTile(this.game.grid);
     this.tileOrigins[position[0]][position[1]] = "new";
   }
-  if (!this.engine.canMove(this.game.grid)) {
+  if (!this.gameplay.canMove(this.game.grid)) {
     this.over = true;
   }
   this.actuate();

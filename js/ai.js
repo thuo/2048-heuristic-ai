@@ -1,6 +1,6 @@
 class AI {
-  constructor(engine) {
-    this.engine = engine;
+  constructor(gameplay) {
+    this.gameplay = gameplay;
     this.timeLimitMs = 200;
   }
 
@@ -37,8 +37,8 @@ class AI {
     if (maximizing) {
       let children = [];
       for (let direction = 0; direction < 4; direction++) {
-        const clone = this.engine.clone(game);
-        if (this.engine.move(clone, direction).moved) {
+        const clone = this.gameplay.clone(game);
+        if (this.gameplay.move(clone, direction).moved) {
           children.push({
             game: clone,
             value: this.eval(clone).value,
@@ -79,7 +79,7 @@ class AI {
       let value = Number.POSITIVE_INFINITY;
       let completed;
       for (let child of children) {
-        const clone = this.engine.clone(game);
+        const clone = this.gameplay.clone(game);
         clone.grid[child.pos.row][child.pos.col] = child.tile;
         const result = this.search(clone, depth - 1, alpha, beta, true);
         if (result.value <= value) {
@@ -159,7 +159,7 @@ class AI {
 
   quality(grid) {
     let gridQuality = 0;
-    const qualityPerTile = this.engine.createGrid(grid.length, 0);
+    const qualityPerTile = this.gameplay.createGrid(grid.length, 0);
     for (let row = 0; row < grid.length; row++) {
       let prevDiff = 0;
       let neighbourCol = -1;
