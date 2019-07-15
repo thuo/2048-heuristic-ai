@@ -98,6 +98,10 @@ class AI {
   eval(game) {
     const { gridQuality, qualityPerTile } = this.quality(game.grid);
     const heuristics = {
+      score: {
+        value: Math.log2(game.score),
+        weight: 2,
+      },
       empty: {
         value: this.empty(game.grid),
         weight: 1
