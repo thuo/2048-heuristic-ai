@@ -1,6 +1,8 @@
 {
-  "eslint.enable": false,
-  "editor.formatOnSave": false,
+  "eslint.enable": true,
+  "editor.formatOnSave": true,
   "javascript.validate.enable": true,
-  "prettier.printWidth": 100
+  "prettier.printWidth": 100,
+  "prettier.trailingComma": "none",
+  "editor.rulers": [100],
 }
