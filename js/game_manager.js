@@ -23,7 +23,8 @@ function GameManager(size, InputManager, Actuator, StorageManager) {
 
 GameManager.prototype.handleWorkerMessage = function(event) {
   if (this.isRunningAI) {
-    this.move(event.data);
+    const { bestMove } = event.data;
+    this.move(bestMove);
     if (!this.over) {
       this.worker.postMessage(this.game);
     }

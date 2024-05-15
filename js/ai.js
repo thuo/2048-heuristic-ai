@@ -8,7 +8,8 @@ class AI {
     // alpha-beta pruning with iterative deepening
     this.startTime = Date.now();
     let bestMove;
-    for (let depth = 1; ; depth++) {
+    let depth = 1;
+    while (true) {
       const result = this.search(
         game,
         depth,
@@ -22,14 +23,15 @@ class AI {
         break;
       }
       bestMove = result.bestMove;
+      depth++;
     }
-    return bestMove;
+    return { bestMove, depth };
   }
 
   search(game, depth, alpha, beta, maximizing) {
     if (depth === 0 || Date.now() >= this.startTime + this.timeLimitMs) {
       return {
-        value: this.eval(game).value,
+        evaluation: this.evaluate(game),
         completed: depth === 0
       };
     }
@@ -41,30 +43,30 @@ class AI {
         if (this.gameplay.move(clone, direction).moved) {
           children.push({
             game: clone,
-            value: this.eval(clone).value,
+            evaluation: this.evaluate(clone),
             direction
           });
         }
       }
-      // evaluate higher valued moves first
-      children.sort((a, b) => b.value - a.value);
+      // search higher evaluation moves first
+      children.sort((a, b) => b.evaluation - a.evaluation);
 
-      let value = Number.NEGATIVE_INFINITY;
+      let evaluation = Number.NEGATIVE_INFINITY;
       let bestMove;
       let completed;
       for (let child of children) {
         const result = this.search(child.game, depth - 1, alpha, beta, false);
-        if (result.value >= value) {
-          value = result.value;
+        if (result.evaluation >= evaluation) {
+          evaluation = result.evaluation;
           bestMove = child.direction;
           completed = result.completed;
         }
-        alpha = Math.max(alpha, value);
+        alpha = Math.max(alpha, evaluation);
         if (alpha >= beta) {
           break;
         }
       }
-      return { value, bestMove, completed };
+      return { evaluation, bestMove, completed };
     } else {
       let children = [];
       for (let row = 0; row < game.grid.length; row++) {
@@ -76,52 +78,51 @@ class AI {
         }
       }
 
-      let value = Number.POSITIVE_INFINITY;
+      let evaluation = Number.POSITIVE_INFINITY;
       let completed;
       for (let child of children) {
         const clone = this.gameplay.clone(game);
         clone.grid[child.pos.row][child.pos.col] = child.tile;
         const result = this.search(clone, depth - 1, alpha, beta, true);
-        if (result.value <= value) {
-          value = result.value;
+        if (result.evaluation <= evaluation) {
+          evaluation = result.evaluation;
           completed = result.completed;
         }
-        beta = Math.min(beta, value);
+        beta = Math.min(beta, evaluation);
         if (alpha >= beta) {
           break;
         }
       }
-      return { value, completed };
+      return { evaluation, completed };
     }
   }
 
-  eval(game) {
-    const { gridQuality, qualityPerTile } = this.quality(game.grid);
+  evaluate(game) {
     const heuristics = {
       score: {
-        value: Math.log2(game.score),
-        weight: 2,
+        rawValue: Math.log2(game.score + 1),
+        weight: 5
       },
       empty: {
-        value: this.empty(game.grid),
-        weight: 1
+        rawValue: this.empty(game.grid),
+        weight: 5
       },
       duplication: {
-        value: this.duplication(game.grid),
-        weight: 2
+        rawValue: this.duplication(game.grid),
+        weight: -4
       },
-      quality: {
-        value: gridQuality,
-        weight: 100
+      friendliness: {
+        rawValue: this.neighbourhoodFrendliness(game.grid),
+        weight: 2
       }
     };
 
-    let value = 0;
-    for (const heuristic of Object.keys(heuristics)) {
-      value += heuristics[heuristic].value * heuristics[heuristic].weight;
+    let evaluation = 0;
+    for (const heuristic in heuristics) {
+      const { rawValue, weight } = heuristics[heuristic];
+      evaluation += rawValue * weight;
     }
-
-    return { value, heuristics, qualityPerTile };
+    return evaluation;
   }
 
   empty(grid) {
@@ -137,89 +138,153 @@ class AI {
   }
 
   duplication(grid) {
-    const duplicates = {};
+    const exists = {};
+    let duplication = 0;
     for (let row = 0; row < grid.length; row++) {
       for (let col = 0; col < grid.length; col++) {
         const tile = grid[row][col];
         if (!tile) {
           continue;
         }
-        const tileCost = Math.log2(tile);
-        if (duplicates[tileCost] !== undefined) {
-          duplicates[tileCost]++;
+        if (exists[tile]) {
+          duplication += Math.log2(tile);
         } else {
-          duplicates[tileCost] = 0;
+          exists[tile] = true;
         }
-      }
-    }
-    let duplication = 0;
-    for (const tile of Object.keys(duplicates)) {
-      if (tile > 2) {
-        duplication -= tile * duplicates[tile];
       }
     }
     return duplication;
   }
 
-  quality(grid) {
-    let gridQuality = 0;
-    const qualityPerTile = this.gameplay.createGrid(grid.length, 0);
+  neighbourhoodFrendliness(grid) {
+    const friendliness = this.gameplay.createGrid(grid.length, 0);
+
+    // Row-wise neighbourhood friendliness.
     for (let row = 0; row < grid.length; row++) {
-      let prevDiff = 0;
-      let neighbourCol = -1;
-      for (let col = 0; col < grid.length; col++) {
-        const tile = grid[row][col];
-        if (!tile) {
+      let prevCol = 0;
+      let col = 1;
+      for (let nextCol = 2; nextCol < grid.length; nextCol++) {
+        const next = grid[row][nextCol];
+        if (!next) {
           continue;
         }
-        let tileQuality;
-        let neighbour = neighbourCol >= 0 ? grid[row][neighbourCol] : null;
-        if (neighbour) {
-          let diff = tile - neighbour;
-          if ((prevDiff >= 0 && diff >= 0) || (prevDiff <= 0 && diff <= 0)) {
-            tileQuality = tile > neighbour ? neighbour / tile : tile / neighbour;
-          } else {
-            tileQuality = -Math.min(Math.abs(prevDiff), Math.abs(diff));
-          }
-          prevDiff = diff;
-        } else {
-          tileQuality = tile;
+
+        const current = grid[row][col];
+        if (!current) {
+          col = nextCol;
+          continue;
         }
-        neighbourCol = col;
-        qualityPerTile[row][col] = tileQuality;
+
+        const prev = grid[row][prevCol];
+        if (!prev) {
+          prevCol = col;
+          col = nextCol;
+          continue;
+        }
+
+        const prevRatio = current / prev;
+        const nextRatio = next / current;
+        let friendlinessFactor = 0;
+
+        if ((prevRatio > 1 && nextRatio > 1) || (prevRatio < 1 && nextRatio < 1)) {
+          friendlinessFactor =
+            Math.min(prevRatio, 1 / prevRatio) + Math.min(nextRatio, 1 / nextRatio);
+        } else if (prevRatio === 1 || nextRatio === 1) {
+          friendlinessFactor =
+            prevRatio === 1
+              ? Math.min(nextRatio, 1 / nextRatio)
+              : Math.min(prevRatio, 1 / prevRatio);
+        } else if (prevRatio < 1 && nextRatio > 1) {
+          friendlinessFactor = Math.min(nextRatio, 1 / nextRatio, prevRatio, 1 / prevRatio) - 0.2;
+        } else {
+          friendlinessFactor = Math.min(nextRatio, 1 / nextRatio, prevRatio, 1 / prevRatio) - 2;
+        }
+
+        const prevFriendliness = friendlinessFactor * Math.log2(prev);
+        const currentFriendliness = friendlinessFactor * Math.log2(current);
+        const nextFriendliness = friendlinessFactor * Math.log2(next);
+
+        friendliness[row][prevCol] += prevFriendliness;
+        friendliness[row][col] += currentFriendliness;
+        friendliness[row][nextCol] += nextFriendliness;
+
+        prevCol = col;
+        col = nextCol;
       }
     }
 
+    // Column-wise neighbourhood friendliness.
     for (let col = 0; col < grid.length; col++) {
-      let prevDiff = 0;
-      let neighbourRow = -1;
-      for (let row = 0; row < grid.length; row++) {
-        const tile = grid[row][col];
-        if (!tile) {
+      let prevRow = 0;
+      let row = 1;
+      for (let nextRow = 2; nextRow < grid.length; nextRow++) {
+        const next = grid[nextRow][col];
+        if (!next) {
           continue;
         }
-        let tileQuality;
-        let neighbour = neighbourRow >= 0 ? grid[neighbourRow][col] : null;
-        if (neighbour) {
-          let diff = tile - neighbour;
-          if ((prevDiff >= 0 && diff >= 0) || (prevDiff <= 0 && diff <= 0)) {
-            tileQuality = tile > neighbour ? neighbour / tile : tile / neighbour;
-          } else {
-            tileQuality = -Math.min(Math.abs(prevDiff), Math.abs(diff));
-          }
-          prevDiff = diff;
-        } else {
-          tileQuality = tile;
+
+        const current = grid[row][col];
+        if (!current) {
+          row = nextRow;
+          continue;
         }
-        neighbourRow = row;
-        if (qualityPerTile[row][col] > 0 && tileQuality > 0) {
-          qualityPerTile[row][col] = Math.max(qualityPerTile[row][col], tileQuality);
-        } else {
-          qualityPerTile[row][col] = Math.min(qualityPerTile[row][col], tileQuality);
+
+        const prev = grid[prevRow][col];
+        if (!prev) {
+          prevRow = row;
+          row = nextRow;
+          continue;
         }
-        gridQuality += qualityPerTile[row][col];
+
+        const prevRatio = current / prev;
+        const nextRatio = next / current;
+        let friendlinessFactor = 0;
+
+        if ((prevRatio > 1 && nextRatio > 1) || (prevRatio < 1 && nextRatio < 1)) {
+          friendlinessFactor =
+            Math.min(prevRatio, 1 / prevRatio) + Math.min(nextRatio, 1 / nextRatio);
+        } else if (prevRatio === 1 || nextRatio === 1) {
+          friendlinessFactor =
+            prevRatio === 1
+              ? Math.min(nextRatio, 1 / nextRatio)
+              : Math.min(prevRatio, 1 / prevRatio);
+        } else if (prevRatio < 1 && nextRatio > 1) {
+          friendlinessFactor = Math.min(nextRatio, 1 / nextRatio, prevRatio, 1 / prevRatio) - 0.2;
+        } else {
+          friendlinessFactor = Math.min(nextRatio, 1 / nextRatio, prevRatio, 1 / prevRatio) - 2;
+        }
+
+        const prevFriendliness = friendlinessFactor * Math.log2(prev);
+        const currentFriendliness = friendlinessFactor * Math.log2(current);
+        const nextFriendliness = friendlinessFactor * Math.log2(next);
+
+        friendliness[prevRow][col] =
+          friendliness[prevRow][col] >= 0 && prevFriendliness > 0
+            ? Math.max(friendliness[prevRow][col], prevFriendliness)
+            : Math.min(friendliness[prevRow][col], prevFriendliness);
+
+        friendliness[row][col] =
+          friendliness[row][col] >= 0 && currentFriendliness > 0
+            ? Math.max(friendliness[row][col], currentFriendliness)
+            : Math.min(friendliness[row][col], currentFriendliness);
+
+        friendliness[nextRow][col] =
+          friendliness[nextRow][col] >= 0 && nextFriendliness > 0
+            ? Math.max(friendliness[nextRow][col], nextFriendliness)
+            : Math.min(friendliness[nextRow][col], nextFriendliness);
+
+        prevRow = row;
+        row = nextRow;
       }
     }
-    return { gridQuality, qualityPerTile };
+
+    let totalFriendliness = 0;
+    for (let row = 0; row < grid.length; row++) {
+      for (let col = 0; col < grid.length; col++) {
+        totalFriendliness += friendliness[row][col];
+      }
+    }
+
+    return totalFriendliness;
   }
 }
